@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Earth - Advanced WebGL Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', 'Roboto Mono', monospace;
+            overflow: hidden;
+            background: #000000;
+            color: #00ffcc;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px 20px;
+            border: 2px solid #00ffcc;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.8;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+            max-width: 300px;
+        }
+
+        #info h1 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc;
+            letter-spacing: 2px;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+            z-index: 200;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 15px;
+            border: 1px solid #00ffcc;
+            border-radius: 4px;
+            font-size: 11px;
+            backdrop-filter: blur(10px);
+            line-height: 1.6;
+        }
+
+        #gui-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border: 2px solid #00ffcc;
+            border-radius: 4px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            min-width: 220px;
+        }
+
+        #gui-container h3 {
+            color: #00ffcc;
+            margin-bottom: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .gui-control {
+            margin: 8px 0;
+            color: #fff;
+        }
+
+        .gui-control label {
+            display: block;
+            margin-bottom: 4px;
+            color: #ccc;
+        }
+
+        .gui-control input[type="range"] {
+            width: 100%;
+            margin-top: 4px;
+        }
+
+        .gui-control input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .gui-value {
+            color: #00ffcc;
+            font-weight: bold;
+        }
+
+        #credits {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 10px;
+            color: #666;
+            text-align: right;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: #333;
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #00ffcc;
+            width: 0%;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px #00ffcc;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="loading">
+        INITIALIZING DIGITAL TWIN...<br>
+        <span style="font-size: 14px;">◢◤◢◤◢◤◢◤◢◤</span>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+    </div>
+
+    <div id="info">
+        <h1>◢ EARTH ◣</h1>
+        <div>FPS: <span id="fps" class="gui-value">60</span></div>
+        <div>Triangles: <span id="triangles" class="gui-value">0</span></div>
+        <div>Instances: <span id="instances" class="gui-value">0</span></div>
+        <div>Vertices: <span id="vertices" class="gui-value">0</span></div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #00ffcc;">
+            <strong>CONTROLS</strong><br>
+            Mouse: Rotate<br>
+            Scroll: Zoom<br>
+            Space: Toggle Rotation
+        </div>
+    </div>
+
+    <div id="stats" class="hidden">
+        Render Time: <span id="render-time">0</span>ms<br>
+        Draw Calls: <span id="draw-calls">0</span><br>
+        Memory: <span id="memory">0</span> MB
+    </div>
+
+    <div id="gui-container">
+        <h3>SIMULATION</h3>
+
+        <div class="gui-control">
+            <label>
+                <input type="checkbox" id="autoRotate" checked>
+                Auto Rotate
+            </label>
+        </div>
+
+        <div class="gui-control">
+            <label>
+                Rotation Speed: <span id="rotateSpeedValue" class="gui-value">0.3</span>
+            </label>
+            <input type="range" id="rotateSpeed" min="0" max="2" step="0.05" value="0.3">
+        </div>
+
+        <div class="gui-control">
+            <label>
+                Bloom Intensity: <span id="bloomValue" class="gui-value">0.6</span>
+            </label>
+            <input type="range" id="bloom" min="0" max="2" step="0.1" value="0.6">
+        </div>
+
+        <div class="gui-control">
+            <label>
+                Ocean Level: <span id="oceanLevelValue" class="gui-value">0.15</span>
+            </label>
+            <input type="range" id="oceanLevel" min="0" max="0.5" step="0.01" value="0.15">
+        </div>
+
+        <div class="gui-control">
+            <label>
+                Atmosphere Glow: <span id="atmosphereValue" class="gui-value">4.0</span>
+            </label>
+            <input type="range" id="atmosphere" min="1" max="8" step="0.5" value="4.0">
+        </div>
+
+        <div class="gui-control">
+            <label>
+                Cloud Speed: <span id="cloudSpeedValue" class="gui-value">1.0</span>
+            </label>
+            <input type="range" id="cloudSpeed" min="0" max="3" step="0.1" value="1.0">
+        </div>
+
+        <div class="gui-control">
+            <label>
+                <input type="checkbox" id="showClouds" checked>
+                Show Clouds
+            </label>
+        </div>
+
+        <div class="gui-control">
+            <label>
+                <input type="checkbox" id="showTrees" checked>
+                Show Ecosystem
+            </label>
+        </div>
+
+        <div class="gui-control">
+            <label>
+                <input type="checkbox" id="showStats" checked>
+                Show Stats
+            </label>
+        </div>
+    </div>
+
+    <div id="credits">
+        Earth Digital Twin v2.0<br>
+        WebGL · Three.js · GLSL
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        const CONFIG = {
+            terrain: {
+                detail: 85,
+                noiseScale: 2.8,
+                noiseStrength: 0.35,
+                octaves: 4,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                radius: 2.0,
+                seed: 42
+            },
+            ocean: {
+                level: 0.15,
+                opacity: 0.75,
+                fresnelPower: 3.5,
+                specularPower: 128.0,
+                waveSpeed: 0.3,
+                waveAmplitude: 0.02,
+                color: new THREE.Color(0x0066aa)
+            },
+            atmosphere: {
+                thickness: 0.15,
+                opacity: 0.8,
+                glowPower: 4.0,
+                color: new THREE.Color(0.27, 0.55, 0.95),
+                scatteringPower: 2.5
+            },
+            ecosystem: {
+                treeCount: 5000,
+                minHeight: 0.05,
+                maxHeight: 0.45,
+                treeScale: 0.015,
+                varietyCount: 3
+            },
+            camera: {
+                fov: 60,
+                near: 0.1,
+                far: 1000,
+                position: new THREE.Vector3(0, 0, 7),
+                lookAt: new THREE.Vector3(0, 0, 0)
+            },
+            controls: {
+                autoRotate: true,
+                autoRotateSpeed: 0.3,
+                dampingFactor: 0.05,
+                enableDamping: true,
+                minDistance: 3,
+                maxDistance: 20,
+                enablePan: false,
+                rotateSpeed: 0.5,
+                zoomSpeed: 1.0
+            },
+            rendering: {
+                antialias: true,
+                alpha: true,
+                bloomStrength: 0.6,
+                bloomRadius: 0.8,
+                bloomThreshold: 0.1,
+                toneMappingExposure: 1.2,
+                shadowMapSize: 2048,
+                pixelRatio: 2
+            },
+            stars: {
+                count: 2000,
+                radius: 100,
+                size: 0.8,
+                twinkleSpeed: 0.5
+            },
+            lighting: {
+                sunIntensity: 2.5,
+                ambientIntensity: 0.4,
+                hemiIntensity: 0.6,
+                sunPosition: new THREE.Vector3(5, 2, 5)
+            },
+            colors: {
+                deepOcean: { h: 0.58, s: 0.7, l: 0.15 },
+                shallowWater: { h: 0.5, s: 0.6, l: 0.45 },
+                beach: { h: 0.12, s: 0.3, l: 0.65 },
+                lowlands: { h: 0.28, s: 0.5, l: 0.25 },
+                forest: { h: 0.32, s: 0.55, l: 0.22 },
+                hills: { h: 0.12, s: 0.4, l: 0.35 },
+                mountains: { h: 0, s: 0, l: 0.45 },
+                peaks: { h: 0, s: 0, l: 0.85 }
+            },
+            performance: {
+                targetFPS: 60,
+                adaptiveQuality: true,
+                fpsCheckInterval: 1000
+            }
+        };
+
+        class SimplexNoise {
+            constructor(seed = Math.random()) {
+                this.seed = seed;
+
+                this.grad3 = [
+                    [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+                    [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+                    [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
+                ];
+
+                this.p = [];
+                for(let i = 0; i < 256; i++) {
+                    this.p[i] = Math.floor(this.seededRandom(seed + i) * 256);
+                }
+
+                this.perm = [];
+                this.permMod12 = [];
+                for(let i = 0; i < 512; i++) {
+                    this.perm[i] = this.p[i & 255];
+                    this.permMod12[i] = this.perm[i] % 12;
+                }
+            }
+
+            seededRandom(seed) {
+                const x = Math.sin(seed) * 10000;
+                return x - Math.floor(x);
+            }
+
+            dot(g, x, y, z) {
+                return g[0] * x + g[1] * y + g[2] * z;
+            }
+
+            noise(xin, yin, zin) {
+                const F3 = 1.0 / 3.0;
+                const G3 = 1.0 / 6.0;
+
+                let n0, n1, n2, n3;
+
+                const s = (xin + yin + zin) * F3;
+                const i = Math.floor(xin + s);
+                const j = Math.floor(yin + s);
+                const k = Math.floor(zin + s);
+
+                const t = (i + j + k) * G3;
+                const X0 = i - t;
+                const Y0 = j - t;
+                const Z0 = k - t;
+                const x0 = xin - X0;
+                const y0 = yin - Y0;
+                const z0 = zin - Z0;
+
+                let i1, j1, k1;
+                let i2, j2, k2;
+
+                if(x0 >= y0) {
+                    if(y0 >= z0) {
+                        i1=1; j1=0; k1=0; i2=1; j2=1; k2=0;
+                    } else if(x0 >= z0) {
+                        i1=1; j1=0; k1=0; i2=1; j2=0; k2=1;
+                    } else {
+                        i1=0; j1=0; k1=1; i2=1; j2=0; k2=1;
+                    }
+                } else {
+                    if(y0 < z0) {
+                        i1=0; j1=0; k1=1; i2=0; j2=1; k2=1;
+                    } else if(x0 < z0) {
+                        i1=0; j1=1; k1=0; i2=0; j2=1; k2=1;
+                    } else {
+                        i1=0; j1=1; k1=0; i2=1; j2=1; k2=0;
+                    }
+                }
+
+                const x1 = x0 - i1 + G3;
+                const y1 = y0 - j1 + G3;
+                const z1 = z0 - k1 + G3;
+                const x2 = x0 - i2 + 2.0 * G3;
+                const y2 = y0 - j2 + 2.0 * G3;
+                const z2 = z0 - k2 + 2.0 * G3;
+                const x3 = x0 - 1.0 + 3.0 * G3;
+                const y3 = y0 - 1.0 + 3.0 * G3;
+                const z3 = z0 - 1.0 + 3.0 * G3;
+
+                const ii = i & 255;
+                const jj = j & 255;
+                const kk = k & 255;
+
+                const gi0 = this.permMod12[ii + this.perm[jj + this.perm[kk]]];
+                const gi1 = this.permMod12[ii + i1 + this.perm[jj + j1 + this.perm[kk + k1]]];
+                const gi2 = this.permMod12[ii + i2 + this.perm[jj + j2 + this.perm[kk + k2]]];
+                const gi3 = this.permMod12[ii + 1 + this.perm[jj + 1 + this.perm[kk + 1]]];
+
+                let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
+                if(t0 < 0) {
+                    n0 = 0.0;
+                } else {
+                    t0 *= t0;
+                    n0 = t0 * t0 * this.dot(this.grad3[gi0], x0, y0, z0);
+                }
+
+                let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
+                if(t1 < 0) {
+                    n1 = 0.0;
+                } else {
+                    t1 *= t1;
+                    n1 = t1 * t1 * this.dot(this.grad3[gi1], x1, y1, z1);
+                }
+
+                let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
+                if(t2 < 0) {
+                    n2 = 0.0;
+                } else {
+                    t2 *= t2;
+                    n2 = t2 * t2 * this.dot(this.grad3[gi2], x2, y2, z2);
+                }
+
+                let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
+                if(t3 < 0) {
+                    n3 = 0.0;
+                } else {
+                    t3 *= t3;
+                    n3 = t3 * t3 * this.dot(this.grad3[gi3], x3, y3, z3);
+                }
+
+                return 32.0 * (n0 + n1 + n2 + n3);
+            }
+
+            fbm(x, y, z, octaves, persistence, lacunarity) {
+                let total = 0;
+                let frequency = 1;
+                let amplitude = 1;
+                let maxValue = 0;
+
+                for(let i = 0; i < octaves; i++) {
+                    total += this.noise(
+                        x * frequency,
+                        y * frequency,
+                        z * frequency
+                    ) * amplitude;
+
+                    maxValue += amplitude;
+                    amplitude *= persistence;
+                    frequency *= lacunarity;
+                }
+
+                return total / maxValue;
+            }
+
+            ridge(x, y, z, octaves, persistence, lacunarity) {
+                let total = 0;
+                let frequency = 1;
+                let amplitude = 1;
+                let maxValue = 0;
+
+                for(let i = 0; i < octaves; i++) {
+                    const n = this.noise(x * frequency, y * frequency, z * frequency);
+                    total += (1 - Math.abs(n)) * amplitude;
+
+                    maxValue += amplitude;
+                    amplitude *= persistence;
+                    frequency *= lacunarity;
+                }
+
+                return total / maxValue;
+            }
+
+            turbulence(x, y, z, octaves) {
+                let total = 0;
+                let frequency = 1;
+
+                for(let i = 0; i < octaves; i++) {
+                    total += Math.abs(this.noise(x * frequency, y * frequency, z * frequency)) / frequency;
+                    frequency *= 2;
+                }
+
+                return total;
+            }
+        }
+
+        const SHADERS = {
+            ocean: {
+                vertex: `
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vViewPosition;
+                    varying vec3 vWorldPosition;
+                    uniform float time;
+                    uniform float waveAmplitude;
+
+                    vec3 mod289(vec3 x) {
+                        return x - floor(x * (1.0 / 289.0)) * 289.0;
+                    }
+
+                    vec4 mod289(vec4 x) {
+                        return x - floor(x * (1.0 / 289.0)) * 289.0;
+                    }
+
+                    vec4 permute(vec4 x) {
+                        return mod289(((x*34.0)+1.0)*x);
+                    }
+
+                    vec4 taylorInvSqrt(vec4 r) {
+                        return 1.79284291400159 - 0.85373472095314 * r;
+                    }
+
+                    float snoise(vec3 v) {
+                        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+                        vec3 i  = floor(v + dot(v, C.yyy));
+                        vec3 x0 = v - i + dot(i, C.xxx);
+
+                        vec3 g = step(x0.yzx, x0.xyz);
+                        vec3 l = 1.0 - g;
+                        vec3 i1 = min(g.xyz, l.zxy);
+                        vec3 i2 = max(g.xyz, l.zxy);
+
+                        vec3 x1 = x0 - i1 + C.xxx;
+                        vec3 x2 = x0 - i2 + C.yyy;
+                        vec3 x3 = x0 - D.yyy;
+
+                        i = mod289(i);
+                        vec4 p = permute(permute(permute(
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+                        float n_ = 0.142857142857;
+                        vec3 ns = n_ * D.wyz - D.xzx;
+
+                        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+                        vec4 x_ = floor(j * ns.z);
+                        vec4 y_ = floor(j - 7.0 * x_);
+
+                        vec4 x = x_ *ns.x + ns.yyyy;
+                        vec4 y = y_ *ns.x + ns.yyyy;
+                        vec4 h = 1.0 - abs(x) - abs(y);
+
+                        vec4 b0 = vec4(x.xy, y.xy);
+                        vec4 b1 = vec4(x.zw, y.zw);
+
+                        vec4 s0 = floor(b0)*2.0 + 1.0;
+                        vec4 s1 = floor(b1)*2.0 + 1.0;
+                        vec4 sh = -step(h, vec4(0.0));
+
+                        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+                        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+
+                        vec3 p0 = vec3(a0.xy,h.x);
+                        vec3 p1 = vec3(a0.zw,h.y);
+                        vec3 p2 = vec3(a1.xy,h.z);
+                        vec3 p3 = vec3(a1.zw,h.w);
+
+                        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                        p0 *= norm.x;
+                        p1 *= norm.y;
+                        p2 *= norm.z;
+                        p3 *= norm.w;
+
+                        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                        m = m * m;
+                        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+                    }
+
+                    void main() {
+                        vPosition = position;
+                        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+
+                        vec3 pos = position;
+                        float wave = snoise(pos * 3.0 + vec3(time * 0.5, time * 0.3, 0.0)) * waveAmplitude;
+                        pos += normalize(pos) * wave;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                        vViewPosition = -mvPosition.xyz;
+                        vNormal = normalize(normalMatrix * normal);
+
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragment: `
+                    uniform vec3 oceanColor;
+                    uniform vec3 lightDirection;
+                    uniform float fresnelPower;
+                    uniform float specularPower;
+                    uniform float opacity;
+                    uniform float time;
+
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vViewPosition;
+                    varying vec3 vWorldPosition;
+
+                    void main() {
+                        vec3 normal = normalize(vNormal);
+                        vec3 viewDir = normalize(vViewPosition);
+
+                        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), fresnelPower);
+
+                        vec3 reflectDir = reflect(-lightDirection, normal);
+                        float spec = pow(max(dot(viewDir, reflectDir), 0.0), specularPower);
+
+                        float caustic1 = sin(vWorldPosition.x * 15.0 + time * 2.0) *
+                                        cos(vWorldPosition.y * 15.0 + time * 1.5);
+                        float caustic2 = sin(vWorldPosition.z * 20.0 - time * 1.8) *
+                                        cos(vWorldPosition.x * 18.0 - time * 2.2);
+                        float caustics = (caustic1 + caustic2) * 0.05 + 0.95;
+
+                        float depth = length(vPosition) / 2.0;
+                        vec3 deepColor = oceanColor * 0.6;
+                        vec3 shallowColor = oceanColor * 1.2;
+                        vec3 color = mix(deepColor, shallowColor, depth);
+
+                        color *= caustics;
+
+                        color += vec3(1.0, 0.98, 0.9) * spec * 0.8;
+
+                        float edgeGlow = pow(fresnel, 0.5) * 0.3;
+                        color += vec3(0.9, 0.95, 1.0) * edgeGlow;
+
+                        float alpha = mix(opacity * 0.5, opacity * 1.0, fresnel);
+
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `
+            },
+            atmosphere: {
+                vertex: `
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vWorldPosition;
+
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vPosition = position;
+                        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragment: `
+                    uniform vec3 glowColor;
+                    uniform float glowPower;
+                    uniform float opacity;
+                    uniform float scatteringPower;
+                    uniform vec3 lightDirection;
+
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vWorldPosition;
+
+                    void main() {
+                        vec3 normal = normalize(vNormal);
+                        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+
+                        float intensity = pow(1.0 - abs(dot(normal, viewDirection)), glowPower);
+
+                        float sunAlignment = max(dot(normal, lightDirection), 0.0);
+                        float scattering = pow(sunAlignment, scatteringPower) * 0.3;
+
+                        vec3 atmosphereColor = glowColor * intensity;
+                        atmosphereColor += vec3(1.0, 0.8, 0.6) * scattering;
+
+                        float altitude = length(vPosition);
+                        float density = smoothstep(0.0, 1.0, 1.0 - (altitude - 2.0) / 0.3);
+
+                        float alpha = intensity * opacity * density;
+
+                        gl_FragColor = vec4(atmosphereColor, alpha);
+                    }
+                `
+            },
+            clouds: {
+                vertex: `
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vWorldPosition;
+
+                    void main() {
+                        vUv = uv;
+                        vNormal = normalize(normalMatrix * normal);
+                        vPosition = position;
+                        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragment: `
+                    uniform float time;
+                    uniform float opacity;
+                    uniform float cloudSpeed;
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    varying vec3 vPosition;
+                    varying vec3 vWorldPosition;
+
+                    float hash(vec2 p) {
+                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+                    }
+
+                    float noise(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+
+                        float a = hash(i);
+                        float b = hash(i + vec2(1.0, 0.0));
+                        float c = hash(i + vec2(0.0, 1.0));
+                        float d = hash(i + vec2(1.0, 1.0));
+
+                        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                    }
+
+                    float fbm(vec2 p) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        float frequency = 1.0;
+
+                        for(int i = 0; i < 5; i++) {
+                            value += amplitude * noise(p * frequency);
+                            frequency *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    void main() {
+
+                        vec2 uv = vUv * 4.0 + vec2(time * cloudSpeed * 0.02, 0.0);
+
+                        float n1 = fbm(uv);
+                        float n2 = fbm(uv * 2.0 + vec2(time * cloudSpeed * 0.01, 0.0));
+                        float n = n1 * 0.7 + n2 * 0.3;
+
+                        float clouds = smoothstep(0.35, 0.75, n);
+
+                        float detail = noise(uv * 8.0) * 0.2;
+                        clouds = smoothstep(0.3, 0.7, clouds + detail);
+
+                        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                        float edge = abs(dot(normalize(vNormal), viewDir));
+                        clouds *= smoothstep(0.15, 0.85, edge);
+
+                        float shadow = mix(0.7, 1.0, noise(uv * 3.0));
+                        vec3 cloudColor = vec3(1.0) * shadow;
+
+                        gl_FragColor = vec4(cloudColor, clouds * opacity * 0.7);
+                    }
+                `
+            },
+            stars: {
+                vertex: `
+                    attribute float size;
+                    attribute vec3 color;
+
+                    varying vec3 vColor;
+                    uniform float time;
+
+                    void main() {
+                        vColor = color;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+
+                        float twinkle = sin(time + position.x * 100.0) * 0.3 + 0.7;
+                        gl_PointSize = size * twinkle * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragment: `
+                    varying vec3 vColor;
+
+                    void main() {
+
+                        vec2 center = gl_PointCoord - vec2(0.5);
+                        float dist = length(center);
+
+                        if(dist > 0.5) discard;
+
+                        float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
+
+                        gl_FragColor = vec4(vColor, alpha);
+                    }
+                `
+            }
+        };
+
+        class Utils {
+            static lerp(start, end, t) {
+                return start * (1 - t) + end * t;
+            }
+
+            static clamp(value, min, max) {
+                return Math.max(min, Math.min(max, value));
+            }
+
+            static smoothstep(edge0, edge1, x) {
+                const t = this.clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+                return t * t * (3.0 - 2.0 * t);
+            }
+
+            static map(value, inMin, inMax, outMin, outMax) {
+                return outMin + (outMax - outMin) * ((value - inMin) / (inMax - inMin));
+            }
+
+            static randomRange(min, max) {
+                return min + Math.random() * (max - min);
+            }
+
+            static sphericalToCartesian(radius, theta, phi) {
+                return new THREE.Vector3(
+                    radius * Math.sin(phi) * Math.cos(theta),
+                    radius * Math.sin(phi) * Math.sin(theta),
+                    radius * Math.cos(phi)
+                );
+            }
+        }
+
+        class PerformanceMonitor {
+            constructor() {
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 60;
+                this.frameTimeHistory = [];
+                this.maxHistoryLength = 60;
+            }
+
+            update() {
+                this.frameCount++;
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+
+                this.frameTimeHistory.push(deltaTime);
+                if(this.frameTimeHistory.length > this.maxHistoryLength) {
+                    this.frameTimeHistory.shift();
+                }
+
+                if(this.frameCount % 10 === 0) {
+                    const avgFrameTime = this.frameTimeHistory.reduce((a, b) => a + b, 0) /
+                                        this.frameTimeHistory.length;
+                    this.fps = Math.round(1000 / avgFrameTime);
+                }
+
+                this.lastTime = currentTime;
+                return this.fps;
+            }
+
+            getAverageFrameTime() {
+                if(this.frameTimeHistory.length === 0) return 0;
+                return this.frameTimeHistory.reduce((a, b) => a + b, 0) /
+                       this.frameTimeHistory.length;
+            }
+        }
+
+        class EarthSimulation {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controls = null;
+                this.composer = null;
+                this.bloomPass = null;
+                this.noise = null;
+                this.terrainMesh = null;
+                this.oceanMesh = null;
+                this.atmosphereMesh = null;
+                this.cloudsMesh = null;
+                this.ecosystemMesh = null;
+                this.stars = null;
+                this.clock = new THREE.Clock();
+                this.perfMonitor = new PerformanceMonitor();
+                this.meshes = [];
+                this.lights = [];
+                this.animationId = null;
+                this.cloudSpeed = 1.0;
+            }
+
+            async init() {
+                try {
+                    console.log('═══════════════════════════════════════════');
+                    console.log('  EARTH DIGITAL TWIN - INITIALIZATION');
+                    console.log('═══════════════════════════════════════════');
+
+                    this.updateProgress(10);
+                    this.setupScene();
+
+                    this.updateProgress(20);
+                    this.setupCamera();
+
+                    this.updateProgress(25);
+                    this.setupRenderer();
+
+                    this.updateProgress(30);
+                    this.setupLights();
+
+                    this.updateProgress(35);
+                    this.setupNoise();
+
+                    this.updateProgress(40);
+                    await this.createStarfield();
+
+                    this.updateProgress(50);
+                    await this.createTerrain();
+
+                    this.updateProgress(65);
+                    this.createOcean();
+
+                    this.updateProgress(75);
+                    this.createAtmosphere();
+
+                    this.updateProgress(80);
+                    this.createClouds();
+
+                    this.updateProgress(85);
+                    await this.createEcosystem();
+
+                    this.updateProgress(90);
+                    this.setupControls();
+
+                    this.updateProgress(95);
+                    this.setupPostProcessing();
+
+                    this.updateProgress(98);
+                    this.setupGUI();
+
+                    this.setupEventListeners();
+
+                    this.updateProgress(100);
+
+                    setTimeout(() => {
+                        document.getElementById('loading').classList.add('hidden');
+                    }, 500);
+
+                    this.animate();
+
+                    console.log('═══════════════════════════════════════════');
+                    console.log('  INITIALIZATION COMPLETE');
+                    console.log('═══════════════════════════════════════════');
+                    this.printStats();
+                } catch(error) {
+                    console.error('FATAL ERROR during initialization:', error);
+                    document.getElementById('loading').innerHTML =
+                        'ERROR: Failed to initialize<br><span style="font-size:12px;">' +
+                        error.message + '</span>';
+                }
+            }
+
+            updateProgress(percent) {
+                document.getElementById('progress').style.width = percent + '%';
+            }
+
+            setupScene() {
+                console.log('→ Creating scene...');
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000000);
+                this.scene.fog = new THREE.FogExp2(0x000000, 0.0015);
+            }
+
+            setupCamera() {
+                console.log('→ Setting up camera...');
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(
+                    CONFIG.camera.fov,
+                    aspect,
+                    CONFIG.camera.near,
+                    CONFIG.camera.far
+                );
+                this.camera.position.copy(CONFIG.camera.position);
+                this.camera.lookAt(CONFIG.camera.lookAt);
+            }
+
+            setupRenderer() {
+                console.log('→ Initializing WebGL renderer...');
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: CONFIG.rendering.antialias,
+                    alpha: CONFIG.rendering.alpha,
+                    powerPreference: 'high-performance',
+                    precision: 'highp'
+                });
+
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.rendering.pixelRatio));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = CONFIG.rendering.toneMappingExposure;
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+
+                const container = document.getElementById('canvas-container');
+                container.appendChild(this.renderer.domElement);
+
+                console.log('  ✓ WebGL Context:', this.renderer.getContext().VERSION);
+                console.log('  ✓ Max Texture Size:', this.renderer.capabilities.maxTextureSize);
+            }
+
+            setupLights() {
+                console.log('→ Creating lighting system...');
+
+                const sunLight = new THREE.DirectionalLight(
+                    0xffffff,
+                    CONFIG.lighting.sunIntensity
+                );
+                sunLight.position.copy(CONFIG.lighting.sunPosition);
+                sunLight.castShadow = true;
+                sunLight.shadow.mapSize.width = CONFIG.rendering.shadowMapSize;
+                sunLight.shadow.mapSize.height = CONFIG.rendering.shadowMapSize;
+                sunLight.shadow.camera.near = 0.5;
+                sunLight.shadow.camera.far = 50;
+                sunLight.shadow.camera.left = -10;
+                sunLight.shadow.camera.right = 10;
+                sunLight.shadow.camera.top = 10;
+                sunLight.shadow.camera.bottom = -10;
+                this.scene.add(sunLight);
+                this.lights.push(sunLight);
+
+                const ambientLight = new THREE.AmbientLight(
+                    0x404060,
+                    CONFIG.lighting.ambientIntensity
+                );
+                this.scene.add(ambientLight);
+                this.lights.push(ambientLight);
+
+                const hemiLight = new THREE.HemisphereLight(
+                    0x7799ff,
+                    0x334455,
+                    CONFIG.lighting.hemiIntensity
+                );
+                hemiLight.position.set(0, 50, 0);
+                this.scene.add(hemiLight);
+                this.lights.push(hemiLight);
+
+                const rimLight = new THREE.DirectionalLight(0x6688ff, 0.5);
+                rimLight.position.set(-3, 1, -5);
+                this.scene.add(rimLight);
+                this.lights.push(rimLight);
+
+                this.lightDirection = sunLight.position.clone().normalize();
+
+                console.log('  ✓ Created', this.lights.length, 'lights');
+            }
+
+            setupNoise() {
+                console.log('→ Initializing noise generator...');
+                this.noise = new SimplexNoise(CONFIG.terrain.seed);
+                console.log('  ✓ Simplex noise ready (seed:', CONFIG.terrain.seed + ')');
+            }
+
+            async createStarfield() {
+                console.log('→ Generating starfield...');
+
+                const geometry = new THREE.BufferGeometry();
+                const positions = [];
+                const colors = [];
+                const sizes = [];
+
+                for(let i = 0; i < CONFIG.stars.count; i++) {
+                    const pos = Utils.sphericalToCartesian(
+                        CONFIG.stars.radius,
+                        Math.random() * Math.PI * 2,
+                        Math.acos(2 * Math.random() - 1)
+                    );
+
+                    positions.push(pos.x, pos.y, pos.z);
+
+                    const temp = Math.random();
+                    if(temp < 0.3) {
+
+                        colors.push(0.7, 0.8, 1.0);
+                    } else if(temp < 0.8) {
+
+                        const brightness = 0.7 + Math.random() * 0.3;
+                        colors.push(brightness, brightness, brightness * 1.05);
+                    } else {
+
+                        colors.push(1.0, 0.9, 0.7);
+                    }
+
+                    sizes.push(CONFIG.stars.size * (0.4 + Math.random() * 0.6));
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 }
+                    },
+                    vertexShader: SHADERS.stars.vertex,
+                    fragmentShader: SHADERS.stars.fragment,
+                    transparent: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.stars = new THREE.Points(geometry, material);
+                this.scene.add(this.stars);
+                this.meshes.push(this.stars);
+
+                console.log('  ✓ Created', CONFIG.stars.count, 'stars');
+            }
+
+            async createTerrain() {
+                console.log('→ Generating procedural terrain...');
+                console.log('  Detail level:', CONFIG.terrain.detail);
+                console.log('  Octaves:', CONFIG.terrain.octaves);
+
+                const startTime = performance.now();
+
+                const geometry = new THREE.IcosahedronGeometry(
+                    CONFIG.terrain.radius,
+                    CONFIG.terrain.detail
+                );
+
+                const positions = geometry.attributes.position;
+                const colors = [];
+                const heightMap = [];
+
+                console.log('  Processing', positions.count, 'vertices...');
+
+                for(let i = 0; i < positions.count; i++) {
+                    const vertex = new THREE.Vector3(
+                        positions.getX(i),
+                        positions.getY(i),
+                        positions.getZ(i)
+                    );
+
+                    const normalized = vertex.clone().normalize();
+
+                    const baseTerrain = this.noise.fbm(
+                        normalized.x * CONFIG.terrain.noiseScale,
+                        normalized.y * CONFIG.terrain.noiseScale,
+                        normalized.z * CONFIG.terrain.noiseScale,
+                        CONFIG.terrain.octaves,
+                        CONFIG.terrain.persistence,
+                        CONFIG.terrain.lacunarity
+                    );
+
+                    const ridges = this.noise.ridge(
+                        normalized.x * CONFIG.terrain.noiseScale * 0.5,
+                        normalized.y * CONFIG.terrain.noiseScale * 0.5,
+                        normalized.z * CONFIG.terrain.noiseScale * 0.5,
+                        3,
+                        0.5,
+                        2.0
+                    );
+
+                    const combinedNoise = baseTerrain * 0.7 + ridges * 0.3;
+
+                    const height = (combinedNoise + 1) * 0.5;
+                    heightMap.push(height);
+
+                    const displacement = combinedNoise * CONFIG.terrain.noiseStrength;
+                    vertex.add(normalized.multiplyScalar(displacement));
+
+                    positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+
+                    const color = this.getTerrainColor(height);
+                    colors.push(color.r, color.g, color.b);
+
+                    if(i % 10000 === 0 && i > 0) {
+                        console.log('  Progress:', Math.round(i / positions.count * 100) + '%');
+                    }
+                }
+
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.computeVertexNormals();
+
+                const material = new THREE.MeshStandardMaterial({
+                    vertexColors: true,
+                    flatShading: false,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    emissive: new THREE.Color(0x000000),
+                    emissiveIntensity: 0
+                });
+
+                this.terrainMesh = new THREE.Mesh(geometry, material);
+                this.terrainMesh.castShadow = true;
+                this.terrainMesh.receiveShadow = true;
+                this.terrainMesh.userData.heightMap = heightMap;
+                this.scene.add(this.terrainMesh);
+                this.meshes.push(this.terrainMesh);
+
+                const endTime = performance.now();
+                console.log('  ✓ Terrain generated in', Math.round(endTime - startTime), 'ms');
+                console.log('  ✓ Vertices:', positions.count);
+                console.log('  ✓ Triangles:', Math.round(positions.count / 3));
+
+                document.getElementById('vertices').textContent = positions.count.toLocaleString();
+                document.getElementById('triangles').textContent =
+                    Math.round(positions.count / 3).toLocaleString();
+            }
+
+            getTerrainColor(height) {
+                const color = new THREE.Color();
+                const c = CONFIG.colors;
+
+                if(height < CONFIG.ocean.level) {
+
+                    color.setHSL(c.deepOcean.h, c.deepOcean.s, c.deepOcean.l);
+                } else if(height < CONFIG.ocean.level + 0.03) {
+
+                    const t = (height - CONFIG.ocean.level) / 0.03;
+                    const shallow = new THREE.Color().setHSL(c.shallowWater.h, c.shallowWater.s, c.shallowWater.l);
+                    const beach = new THREE.Color().setHSL(c.beach.h, c.beach.s, c.beach.l);
+                    color.lerpColors(shallow, beach, t);
+                } else if(height < 0.25) {
+
+                    color.setHSL(c.lowlands.h, c.lowlands.s, c.lowlands.l);
+                } else if(height < 0.40) {
+
+                    const t = (height - 0.25) / 0.15;
+                    const lowland = new THREE.Color().setHSL(c.lowlands.h, c.lowlands.s, c.lowlands.l);
+                    const forest = new THREE.Color().setHSL(c.forest.h, c.forest.s, c.forest.l);
+                    color.lerpColors(lowland, forest, t);
+                } else if(height < 0.55) {
+
+                    color.setHSL(c.hills.h, c.hills.s, c.hills.l);
+                } else if(height < 0.70) {
+
+                    const t = (height - 0.55) / 0.15;
+                    const hills = new THREE.Color().setHSL(c.hills.h, c.hills.s, c.hills.l);
+                    const mountains = new THREE.Color().setHSL(c.mountains.h, c.mountains.s, c.mountains.l);
+                    color.lerpColors(hills, mountains, t);
+                } else {
+
+                    const t = Utils.smoothstep(0.70, 0.85, height);
+                    const mountains = new THREE.Color().setHSL(c.mountains.h, c.mountains.s, c.mountains.l);
+                    const peaks = new THREE.Color().setHSL(c.peaks.h, c.peaks.s, c.peaks.l);
+                    color.lerpColors(mountains, peaks, t);
+                }
+
+                const variation = (Math.random() - 0.5) * 0.05;
+                color.offsetHSL(0, 0, variation);
+
+                return color;
+            }
+
+            createOcean() {
+                console.log('→ Creating ocean layer...');
+
+                const geometry = new THREE.IcosahedronGeometry(
+                    CONFIG.terrain.radius * 1.01,
+                    60
+                );
+
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        oceanColor: { value: CONFIG.ocean.color },
+                        lightDirection: { value: this.lightDirection },
+                        fresnelPower: { value: CONFIG.ocean.fresnelPower },
+                        specularPower: { value: CONFIG.ocean.specularPower },
+                        opacity: { value: CONFIG.ocean.opacity },
+                        time: { value: 0 },
+                        waveAmplitude: { value: CONFIG.ocean.waveAmplitude }
+                    },
+                    vertexShader: SHADERS.ocean.vertex,
+                    fragmentShader: SHADERS.ocean.fragment,
+                    transparent: true,
+                    side: THREE.FrontSide,
+                    depthWrite: false
+                });
+
+                this.oceanMesh = new THREE.Mesh(geometry, material);
+                this.scene.add(this.oceanMesh);
+                this.meshes.push(this.oceanMesh);
+
+                console.log('  ✓ Ocean shader initialized');
+            }
+
+            createAtmosphere() {
+                console.log('→ Creating atmosphere...');
+
+                const geometry = new THREE.IcosahedronGeometry(
+                    CONFIG.terrain.radius * (1 + CONFIG.atmosphere.thickness),
+                    40
+                );
+
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        glowColor: { value: CONFIG.atmosphere.color },
+                        glowPower: { value: CONFIG.atmosphere.glowPower },
+                        opacity: { value: CONFIG.atmosphere.opacity },
+                        scatteringPower: { value: CONFIG.atmosphere.scatteringPower },
+                        lightDirection: { value: this.lightDirection }
+                    },
+                    vertexShader: SHADERS.atmosphere.vertex,
+                    fragmentShader: SHADERS.atmosphere.fragment,
+                    transparent: true,
+                    side: THREE.BackSide,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+
+                this.atmosphereMesh = new THREE.Mesh(geometry, material);
+                this.scene.add(this.atmosphereMesh);
+                this.meshes.push(this.atmosphereMesh);
+
+                console.log('  ✓ Atmospheric scattering shader active');
+            }
+
+            createClouds() {
+                console.log('→ Creating cloud layer...');
+
+                const geometry = new THREE.IcosahedronGeometry(
+                    CONFIG.terrain.radius * 1.015,
+                    50
+                );
+
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        opacity: { value: 0.6 },
+                        cloudSpeed: { value: this.cloudSpeed }
+                    },
+                    vertexShader: SHADERS.clouds.vertex,
+                    fragmentShader: SHADERS.clouds.fragment,
+                    transparent: true,
+                    depthWrite: false
+                });
+
+                this.cloudsMesh = new THREE.Mesh(geometry, material);
+                this.scene.add(this.cloudsMesh);
+                this.meshes.push(this.cloudsMesh);
+
+                console.log('  ✓ Procedural clouds generated');
+            }
+
+            async createEcosystem() {
+                console.log('→ Populating ecosystem...');
+
+                const treeGeometry = this.createTreeGeometry();
+                const treeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2d5016,
+                    roughness: 0.9,
+                    metalness: 0.0,
+                    flatShading: true
+                });
+
+                this.ecosystemMesh = new THREE.InstancedMesh(
+                    treeGeometry,
+                    treeMaterial,
+                    CONFIG.ecosystem.treeCount
+                );
+                this.ecosystemMesh.castShadow = true;
+                this.ecosystemMesh.receiveShadow = true;
+
+                const positions = this.terrainMesh.geometry.attributes.position;
+                const heightMap = this.terrainMesh.userData.heightMap;
+                const matrix = new THREE.Matrix4();
+                const position = new THREE.Vector3();
+                const quaternion = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+
+                let instanceCount = 0;
+                const maxAttempts = CONFIG.ecosystem.treeCount * 3;
+
+                console.log('  Placing trees...');
+
+                for(let attempt = 0; attempt < maxAttempts && instanceCount < CONFIG.ecosystem.treeCount; attempt++) {
+                    const randomIndex = Math.floor(Math.random() * positions.count);
+                    const height = heightMap[randomIndex];
+
+                    if(height > CONFIG.ecosystem.minHeight &&
+                       height < CONFIG.ecosystem.maxHeight &&
+                       Math.random() > 0.3) {
+
+                        position.set(
+                            positions.getX(randomIndex),
+                            positions.getY(randomIndex),
+                            positions.getZ(randomIndex)
+                        );
+
+                        const up = position.clone().normalize();
+                        quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+
+                        const randomRotation = new THREE.Quaternion();
+                        randomRotation.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+                        quaternion.multiply(randomRotation);
+
+                        const treeScale = CONFIG.ecosystem.treeScale *
+                                         Utils.randomRange(0.7, 1.3);
+                        scale.set(treeScale, treeScale, treeScale);
+
+                        matrix.compose(position, quaternion, scale);
+                        this.ecosystemMesh.setMatrixAt(instanceCount, matrix);
+
+                        instanceCount++;
+                    }
+
+                    if(attempt % 5000 === 0 && attempt > 0) {
+                        console.log('  Progress:', instanceCount, '/', CONFIG.ecosystem.treeCount);
+                    }
+                }
+
+                this.ecosystemMesh.count = instanceCount;
+                this.ecosystemMesh.instanceMatrix.needsUpdate = true;
+                this.scene.add(this.ecosystemMesh);
+                this.meshes.push(this.ecosystemMesh);
+
+                document.getElementById('instances').textContent = instanceCount.toLocaleString();
+                console.log('  ✓ Placed', instanceCount, 'trees');
+            }
+
+            createTreeGeometry() {
+
+                const foliage = new THREE.ConeGeometry(1, 3, 6);
+                foliage.translate(0, 1.5, 0);
+
+                const trunk = new THREE.CylinderGeometry(0.25, 0.3, 1, 6);
+                trunk.translate(0, 0.5, 0);
+
+                const geometries = [trunk, foliage];
+                const mergedGeometry = THREE.BufferGeometryUtils
+                    ? THREE.BufferGeometryUtils.mergeBufferGeometries(geometries)
+                    : foliage;
+
+                return mergedGeometry;
+            }
+
+            setupControls() {
+                console.log('→ Setting up orbital controls...');
+
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = CONFIG.controls.enableDamping;
+                this.controls.dampingFactor = CONFIG.controls.dampingFactor;
+                this.controls.autoRotate = CONFIG.controls.autoRotate;
+                this.controls.autoRotateSpeed = CONFIG.controls.autoRotateSpeed;
+                this.controls.minDistance = CONFIG.controls.minDistance;
+                this.controls.maxDistance = CONFIG.controls.maxDistance;
+                this.controls.enablePan = CONFIG.controls.enablePan;
+                this.controls.rotateSpeed = CONFIG.controls.rotateSpeed;
+                this.controls.zoomSpeed = CONFIG.controls.zoomSpeed;
+
+                console.log('  ✓ Controls configured');
+            }
+
+            setupPostProcessing() {
+                console.log('→ Initializing post-processing...');
+
+                this.composer = new EffectComposer(this.renderer);
+
+                const renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(renderPass);
+
+                this.bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    CONFIG.rendering.bloomStrength,
+                    CONFIG.rendering.bloomRadius,
+                    CONFIG.rendering.bloomThreshold
+                );
+                this.composer.addPass(this.bloomPass);
+
+                console.log('  ✓ Bloom pass added');
+            }
+
+            setupGUI() {
+                console.log('→ Creating GUI controls...');
+
+                document.getElementById('autoRotate').addEventListener('change', (e) => {
+                    this.controls.autoRotate = e.target.checked;
+                });
+
+                document.getElementById('rotateSpeed').addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    this.controls.autoRotateSpeed = value;
+                    document.getElementById('rotateSpeedValue').textContent = value.toFixed(2);
+                });
+
+                document.getElementById('bloom').addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    this.bloomPass.strength = value;
+                    document.getElementById('bloomValue').textContent = value.toFixed(1);
+                });
+
+                document.getElementById('oceanLevel').addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    CONFIG.ocean.level = value;
+                    document.getElementById('oceanLevelValue').textContent = value.toFixed(2);
+
+                });
+
+                document.getElementById('atmosphere').addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    this.atmosphereMesh.material.uniforms.glowPower.value = value;
+                    document.getElementById('atmosphereValue').textContent = value.toFixed(1);
+                });
+
+                document.getElementById('cloudSpeed').addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    this.cloudSpeed = value;
+                    this.cloudsMesh.material.uniforms.cloudSpeed.value = value;
+                    document.getElementById('cloudSpeedValue').textContent = value.toFixed(1);
+                });
+
+                document.getElementById('showClouds').addEventListener('change', (e) => {
+                    this.cloudsMesh.visible = e.target.checked;
+                });
+
+                document.getElementById('showTrees').addEventListener('change', (e) => {
+                    this.ecosystemMesh.visible = e.target.checked;
+                });
+
+                document.getElementById('showStats').addEventListener('change', (e) => {
+                    document.getElementById('stats').classList.toggle('hidden', !e.target.checked);
+                });
+
+                console.log('  ✓ GUI initialized');
+            }
+
+            setupEventListeners() {
+                console.log('→ Binding event listeners...');
+
+                window.addEventListener('resize', () => this.onWindowResize(), false);
+
+                document.addEventListener('keydown', (e) => {
+                    if(e.code === 'Space') {
+                        e.preventDefault();
+                        const checkbox = document.getElementById('autoRotate');
+                        checkbox.checked = !checkbox.checked;
+                        this.controls.autoRotate = checkbox.checked;
+                    }
+                });
+
+                console.log('  ✓ Event listeners active');
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                this.animationId = requestAnimationFrame(() => this.animate());
+
+                const deltaTime = this.clock.getDelta();
+                const elapsedTime = this.clock.getElapsedTime();
+
+                this.controls.update();
+
+                if(this.oceanMesh) {
+                    this.oceanMesh.material.uniforms.time.value =
+                        elapsedTime * CONFIG.ocean.waveSpeed;
+                }
+
+                if(this.cloudsMesh) {
+                    this.cloudsMesh.material.uniforms.time.value = elapsedTime;
+                }
+
+                if(this.stars) {
+                    this.stars.material.uniforms.time.value =
+                        elapsedTime * CONFIG.stars.twinkleSpeed;
+                    this.stars.rotation.y += 0.00005;
+                }
+
+                this.composer.render();
+
+                const fps = this.perfMonitor.update();
+                document.getElementById('fps').textContent = fps;
+
+                const renderTime = this.perfMonitor.getAverageFrameTime().toFixed(2);
+                document.getElementById('render-time').textContent = renderTime;
+            }
+
+            printStats() {
+                console.log('');
+                console.log('SCENE STATISTICS:');
+                console.log('─────────────────────────────────────────');
+                console.log('Meshes:', this.meshes.length);
+                console.log('Lights:', this.lights.length);
+
+                let totalVertices = 0;
+                let totalTriangles = 0;
+
+                this.meshes.forEach(mesh => {
+                    if(mesh.geometry) {
+                        const positions = mesh.geometry.attributes.position;
+                        if(positions) {
+                            totalVertices += positions.count;
+                            totalTriangles += Math.floor(positions.count / 3);
+                        }
+                    }
+                });
+
+                console.log('Total Vertices:', totalVertices.toLocaleString());
+                console.log('Total Triangles:', totalTriangles.toLocaleString());
+                console.log('─────────────────────────────────────────');
+            }
+
+            destroy() {
+                console.log('Cleaning up resources...');
+
+                if(this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+
+                this.meshes.forEach(mesh => {
+                    if(mesh.geometry) mesh.geometry.dispose();
+                    if(mesh.material) {
+                        if(Array.isArray(mesh.material)) {
+                            mesh.material.forEach(mat => mat.dispose());
+                        } else {
+                            mesh.material.dispose();
+                        }
+                    }
+                });
+
+                this.renderer.dispose();
+
+                console.log('✓ Cleanup complete');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.clear();
+                console.log('');
+                console.log(' ███████╗ █████╗ ██████╗ ████████╗██╗  ██╗');
+                console.log(' ██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██║  ██║');
+                console.log(' █████╗  ███████║██████╔╝   ██║   ███████║');
+                console.log(' ██╔══╝  ██╔══██║██╔══██╗   ██║   ██╔══██║');
+                console.log(' ███████╗██║  ██║██║  ██║   ██║   ██║  ██║');
+                console.log(' ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝');
+                console.log('');
+                console.log(' Digital Twin Simulation v2.0');
+                console.log(' WebGL · Three.js · GLSL Shaders');
+                console.log('');
+
+                const simulation = new EarthSimulation();
+                await simulation.init();
+
+                window.earthSimulation = simulation;
+                window.THREE = THREE;
+
+                console.log('');
+                console.log('Available debug commands:');
+                console.log('  window.earthSimulation - Main simulation object');
+                console.log('  window.THREE - Three.js library');
+                console.log('');
+
+            } catch(error) {
+                console.error('═══════════════════════════════════════════');
+                console.error('FATAL ERROR:', error);
+                console.error('Stack:', error.stack);
+                console.error('═══════════════════════════════════════════');
+                alert('Failed to initialize Earth simulation: ' + error.message);
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if(window.earthSimulation) {
+                window.earthSimulation.destroy();
+            }
+        });
+
+    </script>
+</body>
+</html>
